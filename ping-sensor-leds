@@ -1,0 +1,470 @@
+#include <Bounce.h>
+#include <avr/pgmspace.h>
+#include <XBee.h>
+
+/*
+  SB-Protoshield basic function test
+  
+  Based on work by DojoDave & Tom Igoe
+  http://www.arduino.cc/en/Tutorial/Button
+   created 2009
+   modified October 8 2009
+   by Dave Hrynkiw, Solarbotics Ltd / HVW Technologies
+   http://www.solarbotics.com
+
+**Note: This sketch uses the "Bounce" library which has to be downloaded and put in your
+  library. Full details here:
+  http://www.arduino.cc/playground/Code/Bounce
+
+The Circuit:
+  * Connect Digital pins 0-3 to the LED header 1-4 (which illuminate on HIGH signal)
+  * Connect Digital pins 8-11 to Switch header 1-4
+    (which pass a LOW signal when pressed)
+*/
+
+// ***********************************************************************************************************
+// *                            LED STRIP CODE
+// ***********************************************************************************************************
+
+// ******** DEBUG ==== should auto config to adapt different mother board *********
+//#define DATA_1 (PORTF |=  0X01)    // DATA 1    // for ATMEGA
+//#define DATA_0 (PORTF &=  0XFE)    // DATA 0    // for ATMEGA
+//#define STRIP_PINOUT DDRF=0xFF  // for ATMEGA
+#define DATA_1 (PORTC |=  0X01)    // DATA 1    // for UNO
+#define DATA_0 (PORTC &=  0XFE)    // DATA 0    // for UNO
+#define STRIP_PINOUT (DDRC=0xFF)    // for UNO
+
+PROGMEM const unsigned long pattern_test_white[10][10]={
+  {0xffffff,0xffffff,0xffffff,0xffffff,0xffffff,0xffffff,0xffffff,0xffffff,0xffffff,0xffffff},
+  {0xffffff,0xffffff,0xffffff,0xffffff,0xffffff,0xffffff,0xffffff,0xffffff,0xffffff,0xffffff},
+  {0xffffff,0xffffff,0xffffff,0xffffff,0xffffff,0xffffff,0xffffff,0xffffff,0xffffff,0xffffff},
+  {0xffffff,0xffffff,0xffffff,0xffffff,0xffffff,0xffffff,0xffffff,0xffffff,0xffffff,0xffffff},
+  {0xffffff,0xffffff,0xffffff,0xffffff,0xffffff,0xffffff,0xffffff,0xffffff,0xffffff,0xffffff},
+  {0xffffff,0xffffff,0xffffff,0xffffff,0xffffff,0xffffff,0xffffff,0xffffff,0xffffff,0xffffff},
+  {0xffffff,0xffffff,0xffffff,0xffffff,0xffffff,0xffffff,0xffffff,0xffffff,0xffffff,0xffffff},
+  {0xffffff,0xffffff,0xffffff,0xffffff,0xffffff,0xffffff,0xffffff,0xffffff,0xffffff,0xffffff},
+  {0xffffff,0xffffff,0xffffff,0xffffff,0xffffff,0xffffff,0xffffff,0xffffff,0xffffff,0xffffff},
+  {0xffffff,0xffffff,0xffffff,0xffffff,0xffffff,0xffffff,0xffffff,0xffffff,0xffffff,0xffffff},
+};
+
+PROGMEM const unsigned long pattern_test_rainbow[10][10]={
+  {0xff0000,0xff7f00,0xffff00,0x00ff00,0x0000ff,0x6f00ff,0x8f00ff,0x000000,0x000000,0x000000},
+  {0x000000,0xff0000,0xff7f00,0xffff00,0x00ff00,0x0000ff,0x6f00ff,0x8f00ff,0x000000,0x000000},
+  {0x000000,0x000000,0xff0000,0xff7f00,0xffff00,0x00ff00,0x0000ff,0x6f00ff,0x8f00ff,0x000000},
+  {0x000000,0x000000,0x000000,0xff0000,0xff7f00,0xffff00,0x00ff00,0x0000ff,0x6f00ff,0x8f00ff},
+  {0x8f00ff,0x000000,0x000000,0x000000,0xff0000,0xff7f00,0xffff00,0x00ff00,0x0000ff,0x6f00ff},
+  {0x6f00ff,0x8f00ff,0x000000,0x000000,0x000000,0xff0000,0xff7f00,0xffff00,0x00ff00,0x0000ff},
+  {0x0000ff,0x6f00ff,0x8f00ff,0x000000,0x000000,0x000000,0xff0000,0xff7f00,0xffff00,0x00ff00},
+  {0x00ff00,0x0000ff,0x6f00ff,0x8f00ff,0x000000,0x000000,0x000000,0xff0000,0xff7f00,0xffff00},
+  {0xffff00,0x00ff00,0x0000ff,0x6f00ff,0x8f00ff,0x000000,0x000000,0x000000,0xff0000,0xff7f00},
+  {0xff7f00,0xffff00,0x00ff00,0x0000ff,0x6f00ff,0x8f00ff,0x000000,0x000000,0x000000,0xff0000},
+};
+
+PROGMEM const unsigned long pattern_test_green[10][10]={
+  {0x0000ff,0x000000,0x000000,0x000000,0x000000,0x000000,0x000000,0x000000,0x000000,0x000000},
+  {0x000000,0x0000ff,0x000000,0x000000,0x000000,0x000000,0x000000,0x000000,0x000000,0x000000},
+  {0x000000,0x000000,0x0000ff,0x000000,0x000000,0x000000,0x000000,0x000000,0x000000,0x000000},
+  {0x000000,0x000000,0x000000,0x0000ff,0x000000,0x000000,0x000000,0x000000,0x000000,0x000000},
+  {0x000000,0x000000,0x000000,0x000000,0x0000ff,0x000000,0x000000,0x000000,0x000000,0x000000},
+  {0x000000,0x000000,0x000000,0x000000,0x000000,0x0000ff,0x000000,0x000000,0x000000,0x000000},
+  {0x000000,0x000000,0x000000,0x000000,0x000000,0x000000,0x0000ff,0x000000,0x000000,0x000000},
+  {0x000000,0x000000,0x000000,0x000000,0x000000,0x000000,0x000000,0x0000ff,0x000000,0x000000},
+  {0x000000,0x000000,0x000000,0x000000,0x000000,0x000000,0x000000,0x000000,0x0000ff,0x000000},
+  {0x000000,0x000000,0x000000,0x000000,0x000000,0x000000,0x000000,0x000000,0x000000,0x0000ff},
+};
+
+PROGMEM const unsigned long pattern_test_color2[10][10]={
+  {0x000000,0x8f00ff,0x8f00ff,0x8f00ff,0x8f00ff,0x8f00ff,0x8f00ff,0x8f00ff,0x8f00ff,0x8f00ff},
+  {0x8f00ff,0x000000,0x8f00ff,0x8f00ff,0x8f00ff,0x8f00ff,0x8f00ff,0x8f00ff,0x8f00ff,0x8f00ff},
+  {0x8f00ff,0x8f00ff,0x000000,0x8f00ff,0x8f00ff,0x8f00ff,0x8f00ff,0x8f00ff,0x8f00ff,0x8f00ff},
+  {0x8f00ff,0x8f00ff,0x8f00ff,0x000000,0x8f00ff,0x8f00ff,0x8f00ff,0x8f00ff,0x8f00ff,0x8f00ff},
+  {0x8f00ff,0x8f00ff,0x8f00ff,0x8f00ff,0x000000,0x8f00ff,0x8f00ff,0x8f00ff,0x8f00ff,0x8f00ff},
+  {0x8f00ff,0x8f00ff,0x8f00ff,0x8f00ff,0x8f00ff,0x000000,0x8f00ff,0x8f00ff,0x8f00ff,0x8f00ff},
+  {0x8f00ff,0x8f00ff,0x8f00ff,0x8f00ff,0x8f00ff,0x8f00ff,0x000000,0x8f00ff,0x8f00ff,0x8f00ff},
+  {0x8f00ff,0x8f00ff,0x8f00ff,0x8f00ff,0x8f00ff,0x8f00ff,0x8f00ff,0x000000,0x8f00ff,0x8f00ff},
+  {0x8f00ff,0x8f00ff,0x8f00ff,0x8f00ff,0x8f00ff,0x8f00ff,0x8f00ff,0x8f00ff,0x000000,0x8f00ff},
+  {0x8f00ff,0x8f00ff,0x8f00ff,0x8f00ff,0x8f00ff,0x8f00ff,0x8f00ff,0x8f00ff,0x8f00ff,0x000000},
+};
+
+PROGMEM const unsigned long pattern_test_red[10][10]={
+  {0xff0000,0x000000,0x000000,0x000000,0x000000,0x000000,0x000000,0x000000,0x000000,0x000000},
+  {0x000000,0xff0000,0x000000,0x000000,0x000000,0x000000,0x000000,0x000000,0x000000,0x000000},
+  {0x000000,0x000000,0xff0000,0x000000,0x000000,0x000000,0x000000,0x000000,0x000000,0x000000},
+  {0x000000,0x000000,0x000000,0xff0000,0x000000,0x000000,0x000000,0x000000,0x000000,0x000000},
+  {0x000000,0x000000,0x000000,0x000000,0xff0000,0x000000,0x000000,0x000000,0x000000,0x000000},
+  {0x000000,0x000000,0x000000,0x000000,0x000000,0xff0000,0x000000,0x000000,0x000000,0x000000},
+  {0x000000,0x000000,0x000000,0x000000,0x000000,0x000000,0xff0000,0x000000,0x000000,0x000000},
+  {0x000000,0x000000,0x000000,0x000000,0x000000,0x000000,0x000000,0xff0000,0x000000,0x000000},
+  {0x000000,0x000000,0x000000,0x000000,0x000000,0x000000,0x000000,0x000000,0xff0000,0x000000},
+  {0x000000,0x000000,0x000000,0x000000,0x000000,0x000000,0x000000,0x000000,0x000000,0xff0000},
+};
+
+PROGMEM const unsigned long pattern_test_one[10][10]={
+  {0x000000,0xff7f00,0xff7f00,0xff7f00,0xff7f00,0xff7f00,0xff7f00,0xff7f00,0xff7f00,0xff7f00},
+  {0xff7f00,0x000000,0xff7f00,0xff7f00,0xff7f00,0xff7f00,0xff7f00,0xff7f00,0xff7f00,0xff7f00},
+  {0xff7f00,0xff7f00,0x000000,0xff7f00,0xff7f00,0xff7f00,0xff7f00,0xff7f00,0xff7f00,0xff7f00},
+  {0xff7f00,0xff7f00,0xff7f00,0x000000,0xff7f00,0xff7f00,0xff7f00,0xff7f00,0xff7f00,0xff7f00},
+  {0xff7f00,0xff7f00,0xff7f00,0xff7f00,0x000000,0xff7f00,0xff7f00,0xff7f00,0xff7f00,0xff7f00},
+  {0xff7f00,0xff7f00,0xff7f00,0xff7f00,0xff7f00,0x000000,0xff7f00,0xff7f00,0xff7f00,0xff7f00},
+  {0xff7f00,0xff7f00,0xff7f00,0xff7f00,0xff7f00,0xff7f00,0x000000,0xff7f00,0xff7f00,0xff7f00},
+  {0xff7f00,0xff7f00,0xff7f00,0xff7f00,0xff7f00,0xff7f00,0xff7f00,0x000000,0xff7f00,0xff7f00},
+  {0xff7f00,0xff7f00,0xff7f00,0xff7f00,0xff7f00,0xff7f00,0xff7f00,0xff7f00,0x000000,0xff7f00},
+  {0xff7f00,0xff7f00,0xff7f00,0xff7f00,0xff7f00,0xff7f00,0xff7f00,0xff7f00,0xff7f00,0x000000},
+};
+
+
+// constants won't change. They're used here to 
+// set pin numbers:
+const int Led1 = 4;      // the number of the LED pin
+const int Led2 = 5;      // the number of the LED pin
+const int Led3 = 6;      // the number of the LED pin
+const int Led4 = 7;      // the number of the LED pin
+
+const byte Button1 = 8;       // the number of the pushbutton pin
+const byte Button2 = 9;       // the number of the pushbutton pin
+const byte Button3 = 10;      // the number of the pushbutton pin
+const byte Button4 = 11;      // the number of the pushbutton pin
+
+
+
+// Variables that will change:
+int Button1State = 0;         // variable for reading the pushbutton status
+int Button2State = 0;         // variable for reading the pushbutton status
+int Button3State = 0;         // variable for reading the pushbutton status
+int Button4State = 0;         // variable for reading the pushbutton status
+
+int Button1Store = 1;         // variable for storing the pushbutton status
+int Button2Store = 1;         // variable for storing the pushbutton status
+int Button3Store = 1;         // variable for storing the pushbutton status
+int Button4Store = 1;         // variable for storing the pushbutton status
+
+// Instantiate a Bounce object with a 5 millisecond debounce time
+Bounce Bounce1 = Bounce( Button1,5 ); 
+Bounce Bounce2 = Bounce( Button2,5 ); 
+Bounce Bounce3 = Bounce( Button3,5 ); 
+Bounce Bounce4 = Bounce( Button4,5 ); 
+
+// this constant won't change.  It's the pin number
+// of the sensor's output:
+const int pingPin = 3;
+
+void setup() {
+  
+  // initialize serial communication:
+  Serial.begin(9600);
+
+  // initialize the LED pins as outputs:
+  pinMode(Led1, OUTPUT);      
+  pinMode(Led2, OUTPUT);      
+  pinMode(Led3, OUTPUT);      
+  pinMode(Led4, OUTPUT);      
+  
+  // initialize the pushbutton pin as inputs:
+  pinMode(Button1, INPUT);
+  digitalWrite(Button1, HIGH); //turn on Pullup Resistor
+  pinMode(Button2, INPUT);     
+  digitalWrite(Button2, HIGH); //turn on Pullup Resistor
+  pinMode(Button3, INPUT);     
+  digitalWrite(Button3, HIGH); //turn on Pullup Resistor
+  pinMode(Button4, INPUT);     
+  digitalWrite(Button4, HIGH); //turn on Pullup Resistor
+  
+  // turn on the LEDs to start with, so you know it's ready to play!
+  digitalWrite(Led1, Button1Store);
+  digitalWrite(Led2, Button1Store);
+  digitalWrite(Led3, Button1Store);
+  digitalWrite(Led4, Button1Store);
+  
+  //LED STRIPS INITIALIZE
+  STRIP_PINOUT;        // set output pin - DEBUG: should auto detect which mother board for use
+  reset_strip();
+  //noInterrupts();
+  
+  // create the XBee object
+  XBee xbee = XBee();
+  
+  uint8_t payload[] = { 0, 0 };
+
+  // SH + SL Address of receiving XBee
+  XBeeAddress64 addr64 = XBeeAddress64(0x0013a200, 0x403e0f30);
+  ZBTxRequest zbTx = ZBTxRequest(addr64, payload, sizeof(payload));
+  ZBTxStatusResponse txStatus = ZBTxStatusResponse();
+
+
+}
+
+void loop(){
+  
+  //SETUP LED STRIP IN LOGIC
+  int seconds=0;
+
+  // Update the debouncer
+  Bounce1.update ( );
+  Bounce2.update ( );
+  Bounce3.update ( );
+  Bounce4.update ( );
+
+  // establish variables for duration of the PING))), 
+  // and the distance result in inches and centimeters:
+  long duration, inches, cm;
+
+  // The PING))) is triggered by a HIGH pulse of 2 or more microseconds.
+  // Give a short LOW pulse beforehand to ensure a clean HIGH pulse:
+  pinMode(pingPin, OUTPUT);
+  digitalWrite(pingPin, LOW);
+  delayMicroseconds(2);
+  digitalWrite(pingPin, HIGH);
+  delayMicroseconds(5);
+  digitalWrite(pingPin, LOW);
+
+  // The same pin is used to read the signal from the PING))): a HIGH
+  // pulse whose duration is the time (in microseconds) from the sending
+  // of the ping to the reception of its echo off of an object.
+  pinMode(pingPin, INPUT);
+  duration = pulseIn(pingPin, HIGH);
+
+  // convert the time into a distance
+  inches = microsecondsToInches(duration);
+  cm = microsecondsToCentimeters(duration);
+
+  // check each of the pushbuttons for a pressed state.
+  // if it is, the buttonXState is HIGH:
+  // read the state of the pushbutton value:
+
+  /***************
+  COLOR PATTERN 1
+  ****************/  
+  int Button1State = Bounce1.read();     //read the button via the debouncer  
+  if ((Button1State != HIGH) || (inches < 12)) {            //if the button was being activated, to something!
+    Button1Store = !Button1Store;        // invert stored signal value (if 1, make it 0; if 0, make it 1)
+    digitalWrite(Led1, Button1Store);    // turn LED to new LED value    
+
+    send_1M_pattern(pattern_test_color2, 10, 100); //GO GREEN!!
+    Serial.print("ANOTHER GREEN WORLD");
+    Serial.println();
+
+    //PRINT THE MEASUREMENTS FOR SENSOR in INCHES AND CENTIMETERES
+    Serial.print(inches);
+    Serial.print("in, ");
+    Serial.print(cm);
+    Serial.print("cm");
+    Serial.println();
+  } 
+  
+  /***************
+  COLOR PATTERN 2
+  ****************/  
+  int Button2State = Bounce2.read();     //read the button via the debouncer
+  if ((Button2State != HIGH) || ((inches > 12) && (inches < 24))) {            //if the button was being activated, to something!     
+    Button2Store = !Button2Store;        // invert stored signal value (if 1, make it 0; if 0, make it 1)
+    digitalWrite(Led2, Button2Store);    // turn LED to new LED value    
+
+    send_1M_pattern(pattern_test_one, 10, 100); //GO RED
+    Serial.print("RED RED WINE");
+    Serial.println();
+
+    //PRINT THE MEASUREMENTS FOR SENSOR in INCHES AND CENTIMETERES
+    Serial.print(inches);
+    Serial.print("in, ");
+    Serial.print(cm);
+    Serial.print("cm");
+    Serial.println();
+  } 
+  
+  /***************
+  COLOR PATTERN 3
+  ****************/
+  int Button3State = Bounce3.read();     //read the button via the debouncer
+  
+  if ((Button3State != HIGH) || ((inches > 24) && (inches < 36))) {            //if the button was being activated, to something!     
+    Button3Store = !Button3Store;        // invert stored signal value (if 1, make it 0; if 0, make it 1)
+    digitalWrite(Led3, Button3Store);    // turn LED to new LED value    
+    send_1M_pattern(pattern_test_white, 10, 100); 
+    Serial.print("IT'S A NICE DAY FOR A WHITE WEDDING");
+    Serial.println();
+    
+    //PRINT THE MEASUREMENTS FOR SENSOR in INCHES AND CENTIMETERES
+    Serial.print(inches);
+    Serial.print("in, ");
+    Serial.print(cm);
+    Serial.print("cm");
+    Serial.println();
+  } 
+  
+  /***************
+  COLOR PATTERN 4
+  ****************/  
+  int Button4State = Bounce4.read();     //read the button via the debouncer
+  if ((Button4State != HIGH) || (inches > 36)) { //if the button was being activated OR the SENSOR DISTANCE is MEDIUM, do something!     
+    Button4Store = !Button4Store;        // invert stored signal value (if 1, make it 0; if 0, make it 1)
+    digitalWrite(Led4, Button4Store);    // turn LED to new LED value    
+    
+    send_1M_pattern(pattern_test_rainbow, 10, 100); // GO BERSERK    
+    Serial.print("SOMEWHERE OVER THE RAINBOW");
+    Serial.println();
+    
+    //PRINT THE MEASUREMENTS FOR SENSOR in INCHES AND CENTIMETERES
+    Serial.print(inches);
+    Serial.print("in, ");
+    Serial.print(cm);
+    Serial.print("cm");
+    Serial.println();
+  } 
+  
+  delay(100);                            //Pause the loop 100mS, otherwise a continuous push makes it seem
+                                         //like it's still bouncing (when it's really toggling really fast)
+ 
+}
+
+/******************************************************************************* 
+  PING SENSOR FUNCTIONS
+*******************************************************************************/
+
+long microsecondsToInches(long microseconds)
+{
+  // According to Parallax's datasheet for the PING))), there are
+  // 73.746 microseconds per inch (i.e. sound travels at 1130 feet per
+  // second).  This gives the distance travelled by the ping, outbound
+  // and return, so we divide by 2 to get the distance of the obstacle.
+  // See: http://www.parallax.com/dl/docs/prod/acc/28015-PING-v1.3.pdf
+  return microseconds / 74 / 2;
+}
+
+long microsecondsToCentimeters(long microseconds)
+{
+  // The speed of sound is 340 m/s or 29 microseconds per centimeter.
+  // The ping travels out and back, so to find the distance of the
+  // object we take half of the distance travelled.
+  return microseconds / 29 / 2;
+}
+
+
+/*******************************************************************************
+ * Function Name  : send_1M_pattern
+ * Description    : Transmit pattern to whole 1 meter strip
+ *                  
+ * Input          : pointer to ROM pattern; pattern length; frame rate
+ *                  
+ * Output         : None
+ * Return         : None
+ *******************************************************************************/
+void send_1M_pattern(const unsigned long data[][10], int pattern_no, int frame_rate)
+{
+  int i=0;
+  int j=0;
+  uint32_t temp_data;
+
+  for (i=0;i<pattern_no;i++)
+  {
+    noInterrupts();
+    for (j=0;j<10;j++)
+    {
+      temp_data=pgm_read_dword_near(&data[i][j]);
+      send_strip(temp_data);
+    }
+    interrupts();
+
+    delay(frame_rate);
+
+  }
+
+
+}
+
+
+void send_digits_pattern(const unsigned long data[][9], int coutner)
+{
+  int i=coutner;
+  int j=0;
+  uint32_t temp_data;
+
+    noInterrupts();
+    for (j=0;j<9;j++)
+    {
+      temp_data=pgm_read_dword_near(&data[i][j]);
+      send_strip(temp_data);
+    }
+    interrupts();
+
+    delay(1000);  			//1s
+
+
+}
+
+
+/*******************************************************************************
+ * Function Name  : send_strip
+ * Description    : Transmit 24 pulse to LED strip
+ *                  
+ * Input          : 24-bit data for the strip
+ *                  
+ * Output         : None
+ * Return         : None
+ *******************************************************************************/
+void send_strip(uint32_t data)
+{
+  int i;
+  unsigned long j=0x800000;
+  
+ 
+  for (i=0;i<24;i++)
+  {
+    if (data & j)
+    {
+      DATA_1;
+      __asm__("nop\n\t");
+      __asm__("nop\n\t");
+      __asm__("nop\n\t");
+      __asm__("nop\n\t");
+      __asm__("nop\n\t");
+      __asm__("nop\n\t");
+      __asm__("nop\n\t");
+      __asm__("nop\n\t");
+      __asm__("nop\n\t");    
+      __asm__("nop\n\t");
+      __asm__("nop\n\t");
+      __asm__("nop\n\t");
+      __asm__("nop\n\t");
+      __asm__("nop\n\t");
+      __asm__("nop\n\t");
+      __asm__("nop\n\t");
+      __asm__("nop\n\t");
+      __asm__("nop\n\t");
+      DATA_0;
+    }
+    else
+    {
+      DATA_1;
+      __asm__("nop\n\t");
+      __asm__("nop\n\t");
+      __asm__("nop\n\t");
+      __asm__("nop\n\t");
+      __asm__("nop\n\t");
+      __asm__("nop\n\t");
+      __asm__("nop\n\t");
+      __asm__("nop\n\t");
+      __asm__("nop\n\t");    
+      DATA_0;
+    }
+
+    j>>=1;
+  }
+
+
+  
+}
+
+/*******************************************************************************
+ * Function Name  : reset_strip
+ * Description    : Send reset pulse to reset all color of the strip
+ *                  
+ * Input          : None
+ *                  
+ * Output         : None
+ * Return         : None
+ *******************************************************************************/
+void	reset_strip()
+{
+  DATA_0;
+  delayMicroseconds(20);
+}
